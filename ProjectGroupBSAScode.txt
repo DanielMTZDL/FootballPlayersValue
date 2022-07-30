@@ -1,0 +1,509 @@
+/* Create library */
+LIBNAME Players "/home/u61519003/sasuser.v94/football players";
+
+/* 2017-2018 */
+PROC IMPORT DATAFILE = "/home/u61519003/sasuser.v94/football players/transfermarkt_fbref_201718.csv" 
+OUT= Players.Season201718
+DBMS=DLM;
+DELIMETER=";" 
+REPLACE; 
+GETNAMES=YES;
+RUN;
+
+/* 2018-2019 */
+PROC IMPORT DATAFILE = "/home/u61519003/sasuser.v94/football players/transfermarkt_fbref_201819.csv" 
+OUT= Players.Season201819
+DBMS=DLM;
+DELIMETER=";" 
+REPLACE; 
+GETNAMES=YES;
+RUN;
+
+/* 2019-2020 */
+PROC IMPORT DATAFILE = "/home/u61519003/sasuser.v94/football players/transfermarkt_fbref_201920.csv" 
+OUT= Players.Season201920
+DBMS=DLM;
+DELIMETER=";" 
+REPLACE; 
+GETNAMES=YES;
+RUN;
+
+/* merge datasets */
+DATA Players.SingleView; 
+SET Players.Season201718 Players.Season201819 Players.Season201920;
+KEEP id	player nationality position squad age value height league minutes goals assists goals_per90 assists_per90 xg xa xg_per90 xa_per90 shots_total shots_on_target shots_on_target_pct passes_completed	passes	passes_pct	passes_into_final_third	tackles	tackles_won	interceptions touches touches_def_pen_area	touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area dribbles_completed	dribbles dribbles_completed_pct	miscontrols	saves save_pct clean_sheets	clean_sheets_pct Season;
+RUN;
+
+/* summary stadistics */
+proc means data=PLAYERS.SINGLEVIEW n  nmiss mean median max min vardef=df;
+	var dribbles_completed dribbles	dribbles_completed_pct miscontrols savesm save_pct clean_sheets	clean_sheets_pct;
+run;
+
+/* Normalization */
+Data players.singleview_;
+	set players.singleview;
+    array a(1) value;
+	Value_Millions = value / 1000000;
+    LogValue = LOG(of a(*));
+RUN;
+
+/*univariate analysis for age, value and height*/
+ 
+proc means data=Players.Singleview_ chartype mean median std min max n vardef=df;
+	var age value height;
+	run;
+ 
+PROC SGPLOT  DATA = Players.Singleview_;
+   VBOX age;
+   title 'Age - Box Plot';
+RUN;
+ 
+PROC SGPLOT  DATA = Players.Singleview_;
+   VBOX value;
+   title 'Value - Box Plot';
+RUN; 
+ 
+PROC SGPLOT  DATA = Players.Singleview_;
+   VBOX height;
+   title 'Height - Box Plot';
+RUN; 
+ 
+proc univariate data=Players.Singleview_;
+   var age;
+   histogram;
+   output out=Age_Ptile pctlpts  = 80 82 84 86 88 90 95 97.5 99 99.5 99.6 99.7 99.8 99.9 100 pctlpre  = P_;
+run;
+ 
+proc univariate data=Players.Singleview_;
+   var value;
+   histogram;
+   output out=Value_Ptile pctlpts  = 80 82 84 86 88 90 95 97.5 99 99.5 99.6 99.7 99.8 99.9 100 pctlpre  = P_;
+run;
+ 
+proc univariate data=Players.Singleview_;
+   var height;
+   histogram;
+   output out=Height_Ptile pctlpts  = 80 82 84 86 88 90 95 97.5 99 99.5 99.6 99.7 99.8 99.9 100 pctlpre  = P_;
+run;
+
+/*Dummies for Categorical*/
+data Players.Singleview_;
+set Players.Singleview_;
+ 
+	/*League*/	
+	if league eq 'Bundesliga' then league_Bundesliga = 1; 
+		else league_Bundesliga = 0;
+	if league eq 'La Liga' then league_LaLiga = 1; 
+		else league_LaLiga = 0;
+	if league eq 'Ligue 1' then league_Ligue1 = 1; 
+		else league_Ligue1 = 0;
+	if league eq 'Premier League' then league_Premier = 1; 
+		else league_Premier = 0;
+	if league eq 'Serie A' then league_SerieA = 1; 
+		else league_SerieA = 0;
+	/*Position*/
+   if position in ('DF','DF,FW','DF,MF', 'FW,DF', 'MF,DF') then Position_DF = 1;
+   	else Position_DF = 0;
+   if position in ('FW','DF,FW','FW,DF', 'FW,MF', 'MF,FW') then Position_FW = 1;
+   	else Position_FW = 0;
+   if position in ('GK','GK,MF') then Position_GK = 1;
+   	else Position_GK = 0;
+   if position in ('MF','DF,MF','FW,MF', 'MF,DF', 'MF,FW') then Position_MF = 1;
+   	else Position_MF = 0; 
+run;
+ 
+proc sql;
+select player, Season 
+from Players.Singleview_
+where age=0;
+quit;
+run;
+ 
+/*change age = 0*/
+data Players.Singleview_;
+set Players.Singleview_;
+if player = 'Christian Rutjens' then age = 20;
+else if player = 'Andrea Ghezzi' then age = 19;
+else if player = 'Miguel Atienza' then age = 21;
+else if player = 'Stefano Turati' then age = 18;
+run;
+ 
+proc sql;
+select player, value, squad, Season 
+from Players.Singleview_
+where height=0;
+quit;
+run;
+ 
+/*change height = 0*/
+data Players.Singleview_;
+set Players.Singleview_;
+if player = 'RaĂşl GarcĂ­a' then height = 183;
+else if player = 'Ismael GutiĂ©rre	' then delete;
+else if player = 'Dion Ruffo Luci' then height = 179;
+else if player = 'Andrea Ghezzi' then height = 178;
+else if player = 'Luca Gagliano' then height = 182;
+else if player = 'Federico Marigosu' then height = 176;
+else if player = 'Denilho Cleonise' then height = 179;
+else if player = 'Luca Falbo' then delete;
+else if player = 'Ilario Monterisi' then height = 190;
+else if player = 'Giacomo Manzari' then height = 178;
+run;
+ 
+/*outliers in value*/
+ 
+data Players.Singleview_;
+set Players.Singleview_;
+if (Value_Millions < 1.5) | (Value_Millions > 80) then delete;
+run;
+
+/*bivariate analysis*/
+ 
+%macro bivariateCont(var);
+	proc corr data = Players.Singleview_ plots = matrix ;
+	VAR  Value_Millions &var;
+	run;
+%mend;
+ 
+%bivariateCont(age);
+%bivariateCont(height);
+%bivariateCont(minutes);
+%bivariateCont(goals);
+%bivariateCont(assists);
+%bivariateCont(xg);
+%bivariateCont(xa);
+%bivariateCont(shots_total);
+%bivariateCont(shots_on_target);
+%bivariateCont(passes_completed);
+%bivariateCont(passes);
+%bivariateCont(passes_into_final_third);
+%bivariateCont(tackles);
+%bivariateCont(tackles_won);
+%bivariateCont(interceptions);
+%bivariateCont(touches);
+
+
+/* Macro for categorical Bi variable analysis */
+%macro CatBiVariable(var,title); 
+
+proc sql;
+create table distr_&var as
+select &var, avg(Value_Millions) as AVG_Value 
+from Players.Singleview_ 
+group by &var;
+quit;
+
+title "&title";
+
+proc SGPLOT data = distr_&var;
+vbar &var/ response=AVG_Value stat=mean;
+title "&title";
+run;
+
+%mend;
+
+/* Categorical Bi variable analysis */
+%CatBiVariable(league_Bundesliga, Bundesliga);
+%CatBiVariable(league_LaLiga, LaLiga);
+%CatBiVariable(league_Ligue1, Ligue1);
+%CatBiVariable(league_Premier, PremierLeague);
+%CatBiVariable(league_SerieA, SerieA );
+%CatBiVariable(Position_DF, Defenders);
+%CatBiVariable(Position_FW , Forwards);
+%CatBiVariable(Position_GK, Goalkeepers);
+%CatBiVariable(Position_MF, Midfielders);
+
+/* Multicolinearity test */
+/*First atempt*/
+
+%Let Varlist = age	height	minutes	goals	assists	xg	xa	shots_total	shots_on_target	passes_completed passes	passes_into_final_third	tackles	
+                tackles_won	interceptions	touches	touches_def_pen_area	touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	dribbles	miscontrols	saves	clean_sheets	league_Bundesliga 	league_LaLiga	 league_Ligue1	league_Premier
+                	league_SerieA 	Position_DF	Position_FW 	Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+quit;
+
+/*Second atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target	passes_completed passes	
+				passes_into_final_third	tackles	tackles_won	interceptions touches_def_pen_area	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed dribbles	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+quit;
+
+/*Third atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target	passes_completed	
+				passes_into_final_third	tackles	tackles_won	interceptions touches_def_pen_area	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed dribbles	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*4th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target	passes_completed	
+				passes_into_final_third	tackles	tackles_won	interceptions	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed dribbles	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*5th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target	passes_completed	
+				passes_into_final_third	tackles	tackles_won	interceptions	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*6th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target	passes_completed	
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*7th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total	shots_on_target		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*8th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_mid_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+/*9th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xg xa	shots_total		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*10th atempt*/
+
+%Let Varlist = age	height	minutes	goals assists xa	shots_total		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*11th atempt*/
+
+%Let Varlist = age	height goals assists xa	shots_total		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_att_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*12th atempt*/
+
+%Let Varlist = age	height goals assists xa	shots_total		
+				passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	touches_att_pen_area	
+                dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga league_LaLiga	 
+                league_Ligue1 league_Premier league_SerieA 	Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*13th atempt*/
+
+%Let Varlist = age	height goals assists xa	shots_total passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*14th atempt*/
+
+%Let Varlist = age	height goals assists xa	passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	dribbles_completed	miscontrols	saves clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*15th atempt*/
+
+%Let Varlist = age	height goals assists xa	passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	dribbles_completed	miscontrols clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*16th atempt*/
+
+%Let Varlist = age	height goals assists passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	dribbles_completed	miscontrols clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*17th atempt*/
+
+%Let Varlist = age	height goals assists passes_into_final_third	tackles_won	interceptions	
+				touches_def_3rd	dribbles_completed clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*18th atempt*/
+
+%Let Varlist = age	height goals assists passes_into_final_third tackles_won		
+				touches_def_3rd	dribbles_completed clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/*19th atempt*/
+
+%Let Varlist = age	height goals assists passes_into_final_third tackles_won		
+				dribbles_completed clean_sheets	league_Bundesliga 
+				league_LaLiga league_Ligue1 league_Premier league_SerieA 	
+				Position_DF	Position_FW Position_GK	Position_MF;
+
+proc reg data=Players.Singleview_;
+model value =  &VarList / vif tol collin;
+title 'Value Predictors - Multicollinearity Investigation 
+of VIF and Tol';
+run;
+
+/* Model*/
+%macro model(Nobs, seed);
+
+/* Create test and train groups */
+proc sql outobs = &Nobs;
+create table test as
+select * from players.singleview_
+order by ranuni(&seed);
+quit;
+
+proc sql;
+create table train as 
+select * from players.singleview_
+except
+select * from test;
+quit;
+
+/*run regresion model. run iterations and finalize model. */
+
+proc reg data=train outest=pred3;
+model logvalue = &varlist / selection=stepwise slentry=0.25
+                           slstay=0.15 details;
+Output Out= TrainOut;
+run;
+%mend;
+
+%model(529, 100);
+%model(529, 200);
+%model(793, 50);
+%model(793, 60);
+%model(1057, 600);
+%model(1057, 700);
+%model(1322, 600);
+%model(1322, 700);
